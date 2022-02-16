@@ -12,40 +12,55 @@ public class Args {
   private static final Integer MIN_LIFTS = 5;
   private static final Integer MAX_LIFTS = 60;
   private static final Integer MAX_RUNS = 20;
-
+  @Parameter(
+      names = {"-l", "--numLifts"},
+      description = "Number of ski lifts",
+      validateWith = NumLifts.class)
+  private Integer numLifts = 40;
+  @Parameter(
+      names = {"-r", "--numRuns"},
+      description = "Mean number of ski lifts each skier rides each day",
+      validateWith = NumRuns.class)
+  private Integer numRuns = 10;
   @Parameter(
       names = {"-t", "--numThreads"},
       description = "Number of threads to execute",
       validateWith = NumThreads.class,
       required = true)
   private Integer numThreads;
-
   @Parameter(
       names = {"-s", "--numSkiers"},
       description = "Number of skiers to generate lift rides for",
       validateWith = NumSkiers.class,
       required = true)
   private Integer numSkiers;
-
-  @Parameter(
-      names = {"-l", "--numLifts"},
-      description = "Number of ski lifts",
-      validateWith = NumLifts.class)
-  private Integer numLifts = 40;
-
-  @Parameter(
-      names = {"-r", "--numRuns"},
-      description = "Mean number of ski lifts each skier rides each day",
-      validateWith = NumRuns.class)
-  private Integer numRuns = 10;
-
   @Parameter(
       description = "The IP address and port of the server",
       converter = AddressConverter.class,
       required = true)
-  private Inet4Address address;
+  private InetSocketAddress address;
 
-  private static class NumThreads implements IParameterValidator {
+  public Integer getNumThreads() {
+    return numThreads;
+  }
+
+  public Integer getNumSkiers() {
+    return numSkiers;
+  }
+
+  public Integer getNumLifts() {
+    return numLifts;
+  }
+
+  public Integer getNumRuns() {
+    return numRuns;
+  }
+
+  public InetSocketAddress getAddress() {
+    return address;
+  }
+
+  public static class NumThreads implements IParameterValidator {
 
     @Override
     public void validate(String name, String value) throws ParameterException {
@@ -63,7 +78,7 @@ public class Args {
     }
   }
 
-  private static class NumSkiers implements IParameterValidator {
+  public static class NumSkiers implements IParameterValidator {
 
     @Override
     public void validate(String name, String value) throws ParameterException {
@@ -81,7 +96,7 @@ public class Args {
     }
   }
 
-  private static class NumLifts implements IParameterValidator {
+  public static class NumLifts implements IParameterValidator {
 
     @Override
     public void validate(String name, String value) throws ParameterException {
@@ -101,7 +116,7 @@ public class Args {
     }
   }
 
-  private static class NumRuns implements IParameterValidator {
+  public static class NumRuns implements IParameterValidator {
 
     @Override
     public void validate(String name, String value) throws ParameterException {
@@ -119,7 +134,7 @@ public class Args {
     }
   }
 
-  private static class AddressConverter implements IStringConverter<InetSocketAddress> {
+  public static class AddressConverter implements IStringConverter<InetSocketAddress> {
 
     @Override
     public InetSocketAddress convert(String s) {
