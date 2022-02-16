@@ -2,8 +2,11 @@ import io.swagger.client.ApiException;
 import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class WorkerRunnable implements Runnable {
+
+  private static final Integer MAX_RETRIES = 5;
 
   private final Integer startId;
   private final Integer endId;
@@ -23,7 +26,7 @@ public class WorkerRunnable implements Runnable {
   @Override
   public void run() {
     SkiersApi apiInstance = new SkiersApi();
-    apiInstance.getApiClient().setBasePath("http://localhost:8080/Server_war_exploded");
+    apiInstance.getApiClient().setBasePath("http://54.245.60.22:8080/Server_war");
 
     for (int i = startId; i <= endId; i++) {
       LiftRide ride = new LiftRide().time(50).liftID(20);
