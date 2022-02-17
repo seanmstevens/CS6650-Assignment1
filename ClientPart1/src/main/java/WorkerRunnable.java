@@ -3,7 +3,6 @@ import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class WorkerRunnable implements Runnable {
@@ -18,7 +17,6 @@ public class WorkerRunnable implements Runnable {
   private final Integer numReqs;
   private final Integer numLifts;
   private final CountDownLatch latch;
-  private final CyclicBarrier barrier;
 
   public WorkerRunnable(
       Integer startId,
@@ -28,8 +26,7 @@ public class WorkerRunnable implements Runnable {
       String serverUrl,
       Integer numReqs,
       Integer numLifts,
-      CountDownLatch latch,
-  CyclicBarrier barrier) {
+      CountDownLatch latch) {
     this.startId = startId;
     this.endId = endId;
     this.startTime = startTime;
@@ -38,7 +35,6 @@ public class WorkerRunnable implements Runnable {
     this.numReqs = numReqs;
     this.numLifts = numLifts;
     this.latch = latch;
-    this.barrier = barrier;
   }
 
   @Override
@@ -46,13 +42,16 @@ public class WorkerRunnable implements Runnable {
     SkiersApi apiInstance = new SkiersApi();
     apiInstance.getApiClient().setBasePath(serverUrl);
 
+    int numSuccessful = 0;
+    int numFailed = 0;
+
     for (int i = 0; i < numReqs; i++) {
       int id = ThreadLocalRandom.current().nextInt(startId, endId + 1);
       int time = ThreadLocalRandom.current().nextInt(startTime, endTime + 1);
       int liftId = ThreadLocalRandom.current().nextInt(1, numLifts + 1);
       int waitTime = ThreadLocalRandom.current().nextInt(1, 11);
 
-      LiftRide ride = new LiftRide().time(time).liftID(liftId);
+      LiftRide ride = new LiftRide().time(time).liftID(liftId).waitTime(waitTime);
 
       boolean success = false;
       int numTries = 0;
@@ -60,11 +59,11 @@ public class WorkerRunnable implements Runnable {
       while (!success && numTries < MAX_RETRIES) {
         try {
           apiInstance.writeNewLiftRide(ride, 56, "2022", "200", id);
-          Client.NUM_SUCCESSFUL.incrementAndGet();
+          numSuccessful++;
           success = true;
         } catch (ApiException e) {
-          // System.err.println("POST request failure: " + e.getMessage());
-          Client.NUM_FAILED.incrementAndGet();
+          System.err.println("POST request failure: " + e.getMessage());
+          numFailed++;
           try {
             Thread.sleep(getWaitTime(numTries++));
           } catch (InterruptedException ex) {
@@ -74,9 +73,12 @@ public class WorkerRunnable implements Runnable {
       }
     }
 
+    Client.NUM_SUCCESSFUL.addAndGet(numSuccessful);
+    Client.NUM_FAILED.addAndGet(numFailed);
+
     latch.countDown();
     try {
-      barrier.await();
+      Client.barrier.await();
     } catch (InterruptedException | BrokenBarrierException e) {
       e.printStackTrace();
     }

@@ -11,11 +11,11 @@ public class Client {
 
   protected static final AtomicInteger NUM_SUCCESSFUL = new AtomicInteger(0);
   protected static final AtomicInteger NUM_FAILED = new AtomicInteger(0);
+  protected static CyclicBarrier barrier;
   private static Integer numSkiers;
   private static Integer numLifts;
   private static String serverUrl;
   private static ExecutorService pool;
-  private static CyclicBarrier barrier;
 
   public static void main(String[] args) throws InterruptedException, BrokenBarrierException {
     Args opts = new Args();
@@ -33,8 +33,8 @@ public class Client {
     int phaseThreeThreads = t / 10;
     int totalThreads = phaseOneThreads + t + phaseThreeThreads;
 
-    pool = Executors.newFixedThreadPool(totalThreads);
-    barrier = new CyclicBarrier(totalThreads);
+    pool = Executors.newFixedThreadPool(t);
+    barrier = new CyclicBarrier(t);
 
     PhaseOptions p1Opts =
         new PhaseOptions(
@@ -51,13 +51,22 @@ public class Client {
     PhaseOptions p3Opts =
         new PhaseOptions("Phase Three", phaseThreeThreads, 1.0, 361, 420, (int) ((numRuns * 0.1)));
 
+    System.out.println(
+        "------ STARTING RUN: "
+            + t
+            + " threads, "
+            + numSkiers
+            + " skiers, "
+            + numLifts
+            + " lifts, "
+            + numRuns
+            + " runs ------");
+    System.out.println();
+
     long start = System.currentTimeMillis();
-    executePhase(p1Opts);
-    System.out.println(Thread.activeCount());
+    // executePhase(p1Opts);
     executePhase(p2Opts);
-    System.out.println(Thread.activeCount());
-    executePhase(p3Opts);
-    System.out.println(Thread.activeCount());
+    // executePhase(p3Opts);
 
     barrier.await();
     pool.shutdown();
@@ -67,8 +76,7 @@ public class Client {
     System.out.println("Total failures: " + NUM_FAILED);
     System.out.println("Time elapsed (sec): " + ((float) (end - start) / 1000));
     System.out.println(
-        "Total throughput (reqs/sec): "
-            + (NUM_SUCCESSFUL.get() + NUM_FAILED.get()) / ((float) (end - start) / 1000));
+        "Total throughput (reqs/sec): " + (NUM_SUCCESSFUL.get()) / ((float) (end - start) / 1000));
     System.out.println(Thread.activeCount());
   }
 
@@ -92,8 +100,7 @@ public class Client {
               serverUrl,
               opts.getNumReqs(),
               numLifts,
-              latch,
-              barrier));
+              latch));
     }
 
     latch.await();
@@ -103,5 +110,7 @@ public class Client {
             + ": "
             + ((int) (opts.getThreshold() * 100))
             + "% OF THREADS COMPLETE ------");
+    System.out.println("Active threads: " + Thread.activeCount());
+    System.out.println();
   }
 }
