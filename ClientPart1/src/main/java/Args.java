@@ -2,7 +2,6 @@ import com.beust.jcommander.IParameterValidator;
 import com.beust.jcommander.IStringConverter;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.ParameterException;
-import java.net.Inet4Address;
 import java.net.InetSocketAddress;
 
 public class Args {

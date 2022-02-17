@@ -1,20 +1,17 @@
 import com.beust.jcommander.JCommander;
-import io.swagger.client.ApiException;
-import io.swagger.client.api.SkiersApi;
-import io.swagger.client.model.LiftRide;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Client {
 
+  protected static final AtomicInteger NUM_SUCCESSFUL = new AtomicInteger(0);
+  protected static final AtomicInteger NUM_FAILED = new AtomicInteger(0);
   private static final Integer DAY_LENGTH = 420;
-  private static final Integer MAX_RETRIES = 5;
-  private static final AtomicInteger numSuccessful = new AtomicInteger(0);
-  private static final AtomicInteger numFailed = new AtomicInteger(0);
+  private static ExecutorService pool;
 
   public static void main(String[] args) throws InterruptedException {
     Args opts = new Args();
@@ -25,77 +22,59 @@ public class Client {
         l = opts.getNumLifts(),
         r = opts.getNumRuns();
 
-    InetSocketAddress addr = opts.getAddress();
-    String serverUrl = "http://" + addr.getHostName() + ":" + addr.getPort() + "/Server_war";
+    InetSocketAddress address = opts.getAddress();
+    String serverUrl = "http://" + address.getHostName() + ":" + address.getPort() + "/Server_war";
+
+    pool = Executors.newFixedThreadPool(5 * opts.getNumThreads());
+
+    PhaseOptions p1Opts =
+        new PhaseOptions(t / 4, s, l, r, serverUrl, 0.2, 1, 90, (int) ((r * 0.2) * (s / (t / 4))));
+
+    PhaseOptions p2Opts =
+        new PhaseOptions(t, s, l, r, serverUrl, 0.2, 91, 360, (int) ((r * 0.6) * (s / t)));
+
+    PhaseOptions p3Opts =
+        new PhaseOptions((int) (t * 0.1), s, l, r, serverUrl, 1.0, 361, 420, (int) ((r * 0.1)));
 
     long start = System.currentTimeMillis();
-    executePhaseOne(t, s, l, r, serverUrl);
+    executePhase(p1Opts);
+    System.out.println("------ PHASE ONE COMPLETE ------");
+
+    executePhase(p2Opts);
+    System.out.println("------ PHASE TWO COMPLETE ------");
+
+    executePhase(p3Opts);
+    System.out.println("------ PHASE THREE COMPLETE ------");
+
+    pool.shutdown();
+    pool.awaitTermination(30, TimeUnit.SECONDS);
     long end = System.currentTimeMillis();
 
-    System.out.println("------ PHASE ONE COMPLETE ------");
-    System.out.println("Time elapsed (ms): " + (end - start));
-    System.out.println("Total successes: " + numSuccessful);
-    System.out.println("Total failures: " + numFailed);
+    System.out.println("Total successes: " + NUM_SUCCESSFUL);
+    System.out.println("Total failures: " + NUM_FAILED);
+    System.out.println("Time elapsed (sec): " + ((float) (end - start) / 1000));
   }
 
-  public static void executePhaseOne(
-      Integer numThreads, Integer numSkiers, Integer numLifts, Integer numRuns, String serverUrl)
-      throws InterruptedException {
-    final double threshold = 0.2;
-    final int startTime = 1;
-    final int endTime = 90;
+  public static void executePhase(PhaseOptions opts) throws InterruptedException {
+    int t = opts.getNumThreads();
+    int s = opts.getNumSkiers();
 
-    int n = numThreads / 4;
-    CountDownLatch latch = new CountDownLatch((int) Math.ceil(n));
-    ExecutorService pool = Executors.newFixedThreadPool(n);
+    CountDownLatch latch = new CountDownLatch((int) Math.ceil(t * opts.getThreshold()));
 
-    for (int i = 0; i < n; i++) {
-      int startId = (numSkiers / n) * i + 1;
-      int endId = i == n - 1 ? numSkiers : (numSkiers / n) * (i + 1);
+    for (int i = 0; i < t; i++) {
+      int startId = (s / t) * i + 1;
+      int endId = i == t - 1 ? s : (s / t) * (i + 1);
 
       pool.execute(
-          () -> {
-            SkiersApi apiInstance = new SkiersApi();
-            apiInstance.getApiClient().setBasePath(serverUrl);
-
-            int[] ids =
-                ThreadLocalRandom.current()
-                    .ints(startId, endId + 1)
-                    .distinct()
-                    .limit(endId - startId + 1)
-                    .toArray();
-
-            for (int id : ids) {
-              int time = ThreadLocalRandom.current().nextInt(startTime, endTime + 1);
-              int liftId = ThreadLocalRandom.current().nextInt(1, numLifts + 1);
-              int waitTime = ThreadLocalRandom.current().nextInt(1, 11);
-
-              LiftRide ride = new LiftRide().time(time).liftID(liftId);
-
-              boolean success = false;
-              int numTries = 0;
-
-              while (!success && numTries < MAX_RETRIES) {
-                try {
-                  apiInstance.writeNewLiftRide(ride, 56, "2022", "200", id);
-                  numSuccessful.incrementAndGet();
-                  success = true;
-                } catch (ApiException e) {
-                  numFailed.incrementAndGet();
-                  try {
-                    Thread.sleep(2 ^ numTries);
-                  } catch (InterruptedException ex) {
-                    ex.printStackTrace();
-                  }
-
-                  numTries++;
-                }
-              }
-            }
-
-            latch.countDown();
-            System.out.println("Thread exiting... ");
-          });
+          new WorkerRunnable(
+              startId,
+              endId,
+              opts.getStartTime(),
+              opts.getEndTime(),
+              opts.getServerUrl(),
+              opts.getNumReqs(),
+              opts.getNumLifts(),
+              latch));
     }
 
     latch.await();
