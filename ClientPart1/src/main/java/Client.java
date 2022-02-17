@@ -1,6 +1,8 @@
 import com.beust.jcommander.JCommander;
 import java.net.InetSocketAddress;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -12,8 +14,9 @@ public class Client {
   protected static final AtomicInteger NUM_FAILED = new AtomicInteger(0);
   private static final Integer DAY_LENGTH = 420;
   private static ExecutorService pool;
+  private static CyclicBarrier barrier;
 
-  public static void main(String[] args) throws InterruptedException {
+  public static void main(String[] args) throws InterruptedException, BrokenBarrierException {
     Args opts = new Args();
     JCommander.newBuilder().addObject(opts).build().parse(args);
 
@@ -25,16 +28,20 @@ public class Client {
     InetSocketAddress address = opts.getAddress();
     String serverUrl = "http://" + address.getHostName() + ":" + address.getPort() + "/Server_war";
 
-    pool = Executors.newFixedThreadPool(5 * opts.getNumThreads());
+    int phaseOneThreads = t / 4;
+    int phaseThreeThreads = t / 10;
+
+    pool = Executors.newFixedThreadPool(phaseOneThreads + t + phaseThreeThreads);
+    barrier = new CyclicBarrier(phaseOneThreads + t + phaseThreeThreads);
 
     PhaseOptions p1Opts =
-        new PhaseOptions(t / 4, s, l, r, serverUrl, 0.2, 1, 90, (int) ((r * 0.2) * (s / (t / 4))));
+        new PhaseOptions(phaseOneThreads, s, l, r, serverUrl, 0.2, 1, 90, (int) ((r * 0.2) * (s / (phaseOneThreads))));
 
     PhaseOptions p2Opts =
         new PhaseOptions(t, s, l, r, serverUrl, 0.2, 91, 360, (int) ((r * 0.6) * (s / t)));
 
     PhaseOptions p3Opts =
-        new PhaseOptions((int) (t * 0.1), s, l, r, serverUrl, 1.0, 361, 420, (int) ((r * 0.1)));
+        new PhaseOptions(phaseThreeThreads, s, l, r, serverUrl, 1.0, 361, 420, (int) ((r * 0.1)));
 
     long start = System.currentTimeMillis();
     executePhase(p1Opts);
@@ -46,8 +53,7 @@ public class Client {
     executePhase(p3Opts);
     System.out.println("------ PHASE THREE COMPLETE ------");
 
-    pool.shutdown();
-    pool.awaitTermination(30, TimeUnit.SECONDS);
+    barrier.await();
     long end = System.currentTimeMillis();
 
     System.out.println("Total successes: " + NUM_SUCCESSFUL);
@@ -74,7 +80,8 @@ public class Client {
               opts.getServerUrl(),
               opts.getNumReqs(),
               opts.getNumLifts(),
-              latch));
+              latch,
+              barrier));
     }
 
     latch.await();

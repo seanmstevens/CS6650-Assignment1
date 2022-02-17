@@ -1,7 +1,9 @@
 import io.swagger.client.ApiException;
 import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class WorkerRunnable implements Runnable {
@@ -16,6 +18,7 @@ public class WorkerRunnable implements Runnable {
   private final Integer numReqs;
   private final Integer numLifts;
   private final CountDownLatch latch;
+  private final CyclicBarrier barrier;
 
   public WorkerRunnable(
       Integer startId,
@@ -25,7 +28,8 @@ public class WorkerRunnable implements Runnable {
       String serverUrl,
       Integer numReqs,
       Integer numLifts,
-      CountDownLatch latch) {
+      CountDownLatch latch,
+  CyclicBarrier barrier) {
     this.startId = startId;
     this.endId = endId;
     this.startTime = startTime;
@@ -34,6 +38,7 @@ public class WorkerRunnable implements Runnable {
     this.numReqs = numReqs;
     this.numLifts = numLifts;
     this.latch = latch;
+    this.barrier = barrier;
   }
 
   @Override
@@ -70,6 +75,11 @@ public class WorkerRunnable implements Runnable {
     }
 
     latch.countDown();
+    try {
+      barrier.await();
+    } catch (InterruptedException | BrokenBarrierException e) {
+      e.printStackTrace();
+    }
   }
 
   private Integer getWaitTime(Integer n) {

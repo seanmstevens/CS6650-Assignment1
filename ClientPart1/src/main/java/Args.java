@@ -11,28 +11,33 @@ public class Args {
   private static final Integer MIN_LIFTS = 5;
   private static final Integer MAX_LIFTS = 60;
   private static final Integer MAX_RUNS = 20;
+
   @Parameter(
       names = {"-l", "--numLifts"},
       description = "Number of ski lifts",
       validateWith = NumLifts.class)
   private Integer numLifts = 40;
+
   @Parameter(
       names = {"-r", "--numRuns"},
       description = "Mean number of ski lifts each skier rides each day",
       validateWith = NumRuns.class)
   private Integer numRuns = 10;
+
   @Parameter(
       names = {"-t", "--numThreads"},
       description = "Number of threads to execute",
       validateWith = NumThreads.class,
       required = true)
   private Integer numThreads;
+
   @Parameter(
       names = {"-s", "--numSkiers"},
       description = "Number of skiers to generate lift rides for",
       validateWith = NumSkiers.class,
       required = true)
   private Integer numSkiers;
+
   @Parameter(
       description = "The IP address and port of the server",
       converter = AddressConverter.class,
