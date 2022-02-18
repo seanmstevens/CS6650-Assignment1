@@ -1,7 +1,6 @@
 import io.swagger.client.ApiException;
 import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -77,11 +76,7 @@ public class WorkerRunnable implements Runnable {
     Client.NUM_FAILED.addAndGet(numFailed);
 
     latch.countDown();
-    try {
-      Client.barrier.await();
-    } catch (InterruptedException | BrokenBarrierException e) {
-      e.printStackTrace();
-    }
+    Client.totalLatch.countDown();
   }
 
   private Integer getWaitTime(Integer n) {

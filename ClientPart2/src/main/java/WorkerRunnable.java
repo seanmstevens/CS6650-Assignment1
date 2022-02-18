@@ -1,9 +1,11 @@
 import io.swagger.client.ApiException;
 import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
-import java.util.concurrent.BrokenBarrierException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class WorkerRunnable implements Runnable {
 
@@ -17,6 +19,10 @@ public class WorkerRunnable implements Runnable {
   private final Integer numReqs;
   private final Integer numLifts;
   private final CountDownLatch latch;
+  private final CountDownLatch totalLatch;
+  private final AtomicInteger numSuccessful;
+  private final AtomicInteger numFailed;
+  private final DataProcessor processor;
 
   public WorkerRunnable(
       Integer startId,
@@ -26,7 +32,11 @@ public class WorkerRunnable implements Runnable {
       String serverUrl,
       Integer numReqs,
       Integer numLifts,
-      CountDownLatch latch) {
+      CountDownLatch latch,
+      CountDownLatch totalLatch,
+      AtomicInteger numSuccessful,
+      AtomicInteger numFailed,
+      DataProcessor processor) {
     this.startId = startId;
     this.endId = endId;
     this.startTime = startTime;
@@ -35,6 +45,10 @@ public class WorkerRunnable implements Runnable {
     this.numReqs = numReqs;
     this.numLifts = numLifts;
     this.latch = latch;
+    this.totalLatch = totalLatch;
+    this.numSuccessful = numSuccessful;
+    this.numFailed = numFailed;
+    this.processor = processor;
   }
 
   @Override
@@ -42,6 +56,7 @@ public class WorkerRunnable implements Runnable {
     SkiersApi apiInstance = new SkiersApi();
     apiInstance.getApiClient().setBasePath(serverUrl);
 
+    List<LatencyRecord> latencyList = new ArrayList<>();
     int numSuccessful = 0;
     int numFailed = 0;
 
@@ -57,12 +72,22 @@ public class WorkerRunnable implements Runnable {
       int numTries = 0;
 
       while (!success && numTries < MAX_RETRIES) {
+        long start = System.currentTimeMillis();
+
         try {
           apiInstance.writeNewLiftRide(ride, 56, "2022", "200", id);
+          long end = System.currentTimeMillis();
+
+          latencyList.add(new LatencyRecord(start, end - start, "POST", "201"));
           numSuccessful++;
           success = true;
         } catch (ApiException e) {
           System.err.println("POST request failure: " + e.getMessage() + ", " + e.getCode());
+          long end = System.currentTimeMillis();
+
+          latencyList.add(
+              new LatencyRecord(start, end - start, "POST", String.valueOf(e.getCode())));
+
           numFailed++;
           try {
             Thread.sleep(getWaitTime(numTries++));
@@ -73,15 +98,12 @@ public class WorkerRunnable implements Runnable {
       }
     }
 
-    Client.NUM_SUCCESSFUL.addAndGet(numSuccessful);
-    Client.NUM_FAILED.addAndGet(numFailed);
+    this.numSuccessful.addAndGet(numSuccessful);
+    this.numFailed.addAndGet(numFailed);
+    this.processor.addRecords(latencyList);
 
-    latch.countDown();
-    try {
-      Client.barrier.await();
-    } catch (InterruptedException | BrokenBarrierException e) {
-      e.printStackTrace();
-    }
+    this.latch.countDown();
+    this.totalLatch.countDown();
   }
 
   private Integer getWaitTime(Integer n) {

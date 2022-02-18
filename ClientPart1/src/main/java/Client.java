@@ -2,7 +2,6 @@ import com.beust.jcommander.JCommander;
 import java.net.InetSocketAddress;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,7 +10,7 @@ public class Client {
 
   protected static final AtomicInteger NUM_SUCCESSFUL = new AtomicInteger(0);
   protected static final AtomicInteger NUM_FAILED = new AtomicInteger(0);
-  protected static CyclicBarrier barrier;
+  protected static CountDownLatch totalLatch;
   private static Integer numSkiers;
   private static Integer numLifts;
   private static String serverUrl;
@@ -33,8 +32,8 @@ public class Client {
     int phaseThreeThreads = t / 10;
     int totalThreads = phaseOneThreads + t + phaseThreeThreads;
 
-    pool = Executors.newFixedThreadPool(t);
-    barrier = new CyclicBarrier(t);
+    pool = Executors.newFixedThreadPool(totalThreads);
+    totalLatch = new CountDownLatch(totalThreads);
 
     PhaseOptions p1Opts =
         new PhaseOptions(
@@ -64,20 +63,22 @@ public class Client {
     System.out.println();
 
     long start = System.currentTimeMillis();
-    // executePhase(p1Opts);
+    executePhase(p1Opts);
     executePhase(p2Opts);
-    // executePhase(p3Opts);
+    executePhase(p3Opts);
 
-    barrier.await();
+    totalLatch.await();
     pool.shutdown();
     long end = System.currentTimeMillis();
 
+    double duration = (double) (end - start) / 1000;
+
     System.out.println("Total successes: " + NUM_SUCCESSFUL);
     System.out.println("Total failures: " + NUM_FAILED);
-    System.out.println("Time elapsed (sec): " + ((float) (end - start) / 1000));
-    System.out.println(
-        "Total throughput (reqs/sec): " + (NUM_SUCCESSFUL.get()) / ((float) (end - start) / 1000));
-    System.out.println(Thread.activeCount());
+    System.out.println("Time elapsed (sec): " + duration);
+    System.out.println("Total throughput (reqs/sec): " + (NUM_SUCCESSFUL.get()) / duration);
+
+    System.exit(0);
   }
 
   public static void executePhase(PhaseOptions opts) throws InterruptedException {
@@ -110,7 +111,5 @@ public class Client {
             + ": "
             + ((int) (opts.getThreshold() * 100))
             + "% OF THREADS COMPLETE ------");
-    System.out.println("Active threads: " + Thread.activeCount());
-    System.out.println();
   }
 }
