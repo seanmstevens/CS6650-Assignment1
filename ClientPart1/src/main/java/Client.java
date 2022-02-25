@@ -1,6 +1,5 @@
 import com.beust.jcommander.JCommander;
 import java.net.InetSocketAddress;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -16,7 +15,7 @@ public class Client {
   private static String serverUrl;
   private static ExecutorService pool;
 
-  public static void main(String[] args) throws InterruptedException, BrokenBarrierException {
+  public static void main(String[] args) throws InterruptedException {
     Args opts = new Args();
     JCommander.newBuilder().addObject(opts).build().parse(args);
 

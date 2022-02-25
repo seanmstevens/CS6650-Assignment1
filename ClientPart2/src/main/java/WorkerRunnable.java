@@ -1,4 +1,5 @@
 import io.swagger.client.ApiException;
+import io.swagger.client.ApiResponse;
 import io.swagger.client.api.SkiersApi;
 import io.swagger.client.model.LiftRide;
 import java.util.ArrayList;
@@ -75,26 +76,36 @@ public class WorkerRunnable implements Runnable {
         long start = System.currentTimeMillis();
 
         try {
-          apiInstance.writeNewLiftRide(ride, 56, "2022", "200", id);
+          ApiResponse<Void> response =
+              apiInstance.writeNewLiftRideWithHttpInfo(ride, 56, "2022", "200", id);
           long end = System.currentTimeMillis();
 
-          latencyList.add(new LatencyRecord(start, end - start, "POST", "201"));
+          if (response.getStatusCode() >= 400) {
+            latencyList.add(
+                new LatencyRecord(
+                    start, end - start, "POST", String.valueOf(response.getStatusCode())));
+            sleepThread(numTries++);
+            continue;
+          }
+
+          latencyList.add(
+              new LatencyRecord(
+                  start, end - start, "POST", String.valueOf(response.getStatusCode())));
           numSuccessful++;
           success = true;
         } catch (ApiException e) {
-          System.err.println("POST request failure: " + e.getMessage() + ", " + e.getCode());
+          // System.err.println("POST request failure: " + e.getMessage() + ", " + e.getCode());
           long end = System.currentTimeMillis();
 
           latencyList.add(
               new LatencyRecord(start, end - start, "POST", String.valueOf(e.getCode())));
 
-          numFailed++;
-          try {
-            Thread.sleep(getWaitTime(numTries++));
-          } catch (InterruptedException ex) {
-            ex.printStackTrace();
-          }
+          sleepThread(numTries++);
         }
+      }
+
+      if (!success) {
+        numFailed++;
       }
     }
 
@@ -104,6 +115,14 @@ public class WorkerRunnable implements Runnable {
 
     this.latch.countDown();
     this.totalLatch.countDown();
+  }
+
+  private void sleepThread(Integer numTries) {
+    try {
+      Thread.sleep(getWaitTime(numTries));
+    } catch (InterruptedException ex) {
+      ex.printStackTrace();
+    }
   }
 
   private Integer getWaitTime(Integer n) {

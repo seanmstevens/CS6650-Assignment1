@@ -1,7 +1,6 @@
 import com.beust.jcommander.JCommander;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -18,8 +17,7 @@ public class Client {
   private static Integer numLifts;
   private static String serverUrl;
 
-  public static void main(String[] args)
-      throws InterruptedException, BrokenBarrierException, IOException {
+  public static void main(String[] args) throws InterruptedException, IOException {
     Args opts = new Args();
     JCommander.newBuilder().addObject(opts).build().parse(args);
 

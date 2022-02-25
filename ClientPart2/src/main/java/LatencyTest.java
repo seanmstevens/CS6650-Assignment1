@@ -8,7 +8,7 @@ public class LatencyTest {
 
   public static void main(String[] args) throws ApiException {
     SkiersApi api = new SkiersApi();
-    api.getApiClient().setBasePath("http://34.221.5.102:8080/Server_war");
+    api.getApiClient().setBasePath("http://35.155.189.248:8080/Server_war");
     List<Long> responseTimes = new ArrayList<>();
 
     long start = System.currentTimeMillis();
